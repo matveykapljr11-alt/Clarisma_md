@@ -1,0 +1,52 @@
+name: Moldova News Bot
+
+on:
+  schedule:
+    # каждый час в 00 минут (UTC+0 = UTC+3 Moldova — значит 03:00–23:00 по местному)
+    - cron: "0 * * * *"
+  workflow_dispatch:   # ← можно запустить вручную из GitHub
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Получаем код репозитория
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 2. Восстанавливаем файл seen_articles.json из кэша
+      #    (чтобы бот помнил, что уже публиковал между запусками)
+      - name: Restore seen articles cache
+        uses: actions/cache@v4
+        with:
+          path: seen_articles.json
+          key: seen-articles-${{ github.run_id }}
+          restore-keys: |
+            seen-articles-
+
+      # 3. Ставим Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # 4. Устанавливаем зависимости
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # 5. Запускаем бота
+      - name: Run bot
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          ANTHROPIC_API_KEY:  ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python src/bot.py
+
+      # 6. Сохраняем обновлённый seen_articles.json в кэш
+      - name: Save seen articles cache
+        uses: actions/cache@v4
+        if: always()
+        with:
+          path: seen_articles.json
+          key: seen-articles-${{ github.run_id }}
